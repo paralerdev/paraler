@@ -1,0 +1,41 @@
+# Example paraler configuration
+# Copy this file to paraler.yaml or ~/.config/paraler/config.yaml
+
+projects:
+  # Example project: Areal
+  areal:
+    path: ~/projects/areal
+    services:
+      backend:
+        cmd: npm run start:dev
+        port: 3010
+        cwd: ./backend
+        health: http://localhost:3010/health
+        env:
+          - NODE_ENV=development
+
+      frontend:
+        cmd: npm run dev
+        port: 5173
+        cwd: ./frontend
+
+      redis:
+        cmd: redis-server --port 6380
+        port: 6380
+
+  # Example project: Another App
+  another-app:
+    path: ~/projects/another-app
+    services:
+      api:
+        cmd: go run ./cmd/api
+        port: 8080
+        health: http://localhost:8080/health
+
+      worker:
+        cmd: go run ./cmd/worker
+
+      web:
+        cmd: pnpm dev
+        port: 3000
+        cwd: ./web

@@ -1,0 +1,29 @@
+# Environment
+.envrc
+CLAUDE.md
+paraler.yaml
+
+# Binaries
+/paraler
+/bin/
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Build
+dist/
+
+# Website (separate deployment)
+website/
