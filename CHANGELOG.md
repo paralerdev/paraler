@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Detailed error messages when service fails to start (shows command and directory)
+- Directory existence check before starting process
+
+### Fixed
+- Project detection for custom-named subdirectories (e.g., `myproject-api`, `myproject-web`)
+
 ## [0.2.0] - 2025-01-23
 
 ### Added
