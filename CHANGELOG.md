@@ -11,8 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detailed error messages when service fails to start (shows command and directory)
 - Directory existence check before starting process
 
+### Changed
+- Error badge is more compact (` !3` instead of ` [!3]`)
+- Long service and project names are truncated with ellipsis in sidebar
+
 ### Fixed
 - Project detection for custom-named subdirectories (e.g., `myproject-api`, `myproject-web`)
+- Error count now resets when service is started or restarted
 
 ## [0.2.0] - 2025-01-23
 
