@@ -439,6 +439,7 @@ func (m *Model) startSelected() tea.Cmd {
 		ids := m.sidebar.GetMultiSelected()
 		return func() tea.Msg {
 			for _, id := range ids {
+				m.logBuffer.Clear(id) // Clear old logs/errors
 				m.manager.Start(id)
 			}
 			m.sidebar.ClearMultiSelect()
@@ -451,6 +452,7 @@ func (m *Model) startSelected() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
+		m.logBuffer.Clear(selected) // Clear old logs/errors
 		m.manager.Start(selected)
 		return ProcessStatusChangedMsg{}
 	}
@@ -487,6 +489,7 @@ func (m *Model) restartSelected() tea.Cmd {
 		ids := m.sidebar.GetMultiSelected()
 		return func() tea.Msg {
 			for _, id := range ids {
+				m.logBuffer.Clear(id) // Clear old logs/errors
 				m.manager.Restart(id)
 			}
 			m.sidebar.ClearMultiSelect()
@@ -499,6 +502,7 @@ func (m *Model) restartSelected() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
+		m.logBuffer.Clear(selected) // Clear old logs/errors
 		m.manager.Restart(selected)
 		return ProcessStatusChangedMsg{}
 	}

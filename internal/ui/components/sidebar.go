@@ -265,7 +265,15 @@ func (s *Sidebar) View(manager *process.Manager, logBuffer *log.Buffer) string {
 
 		if item.IsProject {
 			// Project header (not selectable)
-			b.WriteString(s.styles.ProjectHeader.Render("▸ " + item.Name))
+			projectName := item.Name
+			maxProjectLen := s.width - 6 // borders + "▸ " prefix + margin
+			if maxProjectLen < 3 {
+				maxProjectLen = 3
+			}
+			if len(projectName) > maxProjectLen {
+				projectName = projectName[:maxProjectLen-1] + "…"
+			}
+			b.WriteString(s.styles.ProjectHeader.Render("▸ " + projectName))
 		} else {
 			// Service item
 			proc := manager.Get(item.ID)
@@ -295,13 +303,16 @@ func (s *Sidebar) View(manager *process.Manager, logBuffer *log.Buffer) string {
 
 			// Error badge (only show if errors exist)
 			errorBadge := ""
+			errorBadgeLen := 0
 			if logBuffer != nil {
 				errorCount := logBuffer.ErrorCount(item.ID)
 				if errorCount > 0 {
 					if errorCount > 99 {
-						errorBadge = s.styles.ErrorBadge.Render(" [!99+]")
+						errorBadge = s.styles.ErrorBadge.Render(" !")
+						errorBadgeLen = 2
 					} else {
-						errorBadge = s.styles.ErrorBadge.Render(fmt.Sprintf(" [!%d]", errorCount))
+						errorBadge = s.styles.ErrorBadge.Render(fmt.Sprintf(" !%d", errorCount))
+						errorBadgeLen = 2 + len(fmt.Sprintf("%d", errorCount))
 					}
 				}
 			}
@@ -310,6 +321,22 @@ func (s *Sidebar) View(manager *process.Manager, logBuffer *log.Buffer) string {
 			selMarker := "  "
 			if i == s.selected {
 				selMarker = s.styles.SelectionMarker.Render("› ")
+			}
+
+			// Calculate available width for service name
+			// prefix: selMarker(2) + multiMarker(1) + indicator(1) + space(1) = 5
+			// suffix: healthIndicator(0-2) + errorBadge(0-4)
+			prefixLen := 5
+			suffixLen := len(healthIndicator) + errorBadgeLen
+			innerWidth := s.width - 2 // borders
+			maxNameLen := innerWidth - prefixLen - suffixLen - 1
+			if maxNameLen < 3 {
+				maxNameLen = 3
+			}
+
+			// Truncate service name if needed
+			if len(serviceName) > maxNameLen {
+				serviceName = serviceName[:maxNameLen-1] + "…"
 			}
 
 			// Item text
