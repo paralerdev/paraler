@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Port conflict detection** — warns when port is already in use before starting service
+- Shows process info (PID, name, command) using the port
+- Option to kill blocking process and start service (`k` key)
 - Detailed error messages when service fails to start (shows command and directory)
 - Directory existence check before starting process
 
