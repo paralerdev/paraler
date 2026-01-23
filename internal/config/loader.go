@@ -220,3 +220,112 @@ func (c *Config) HasProject(name string) bool {
 	_, ok := c.Projects[name]
 	return ok
 }
+
+// MoveService moves a service from one project to another
+func (c *Config) MoveService(serviceName, fromProject, toProject string) error {
+	srcProject, ok := c.Projects[fromProject]
+	if !ok {
+		return fmt.Errorf("source project %q not found", fromProject)
+	}
+
+	dstProject, ok := c.Projects[toProject]
+	if !ok {
+		return fmt.Errorf("target project %q not found", toProject)
+	}
+
+	service, ok := srcProject.Services[serviceName]
+	if !ok {
+		return fmt.Errorf("service %q not found in project %q", serviceName, fromProject)
+	}
+
+	// Check if service already exists in target
+	if _, exists := dstProject.Services[serviceName]; exists {
+		return fmt.Errorf("service %q already exists in project %q", serviceName, toProject)
+	}
+
+	// Add to target project
+	if dstProject.Services == nil {
+		dstProject.Services = make(map[string]Service)
+	}
+	dstProject.Services[serviceName] = service
+	c.Projects[toProject] = dstProject
+
+	// Remove from source project
+	delete(srcProject.Services, serviceName)
+
+	// If source project is now empty, remove it entirely
+	if len(srcProject.Services) == 0 {
+		delete(c.Projects, fromProject)
+	} else {
+		c.Projects[fromProject] = srcProject
+	}
+
+	return nil
+}
+
+// ProjectNames returns a sorted list of project names
+func (c *Config) ProjectNames() []string {
+	names := make([]string, 0, len(c.Projects))
+	for name := range c.Projects {
+		names = append(names, name)
+	}
+	return names
+}
+
+// RenameProject renames a project
+func (c *Config) RenameProject(oldName, newName string) error {
+	if oldName == newName {
+		return nil
+	}
+
+	project, ok := c.Projects[oldName]
+	if !ok {
+		return fmt.Errorf("project %q not found", oldName)
+	}
+
+	if _, exists := c.Projects[newName]; exists {
+		return fmt.Errorf("project %q already exists", newName)
+	}
+
+	if newName == "" {
+		return fmt.Errorf("project name cannot be empty")
+	}
+
+	// Add with new name and remove old
+	c.Projects[newName] = project
+	delete(c.Projects, oldName)
+
+	return nil
+}
+
+// RenameService renames a service within a project
+func (c *Config) RenameService(projectName, oldName, newName string) error {
+	if oldName == newName {
+		return nil
+	}
+
+	project, ok := c.Projects[projectName]
+	if !ok {
+		return fmt.Errorf("project %q not found", projectName)
+	}
+
+	service, ok := project.Services[oldName]
+	if !ok {
+		return fmt.Errorf("service %q not found in project %q", oldName, projectName)
+	}
+
+	if _, exists := project.Services[newName]; exists {
+		return fmt.Errorf("service %q already exists in project %q", newName, projectName)
+	}
+
+	if newName == "" {
+		return fmt.Errorf("service name cannot be empty")
+	}
+
+	// Add with new name and remove old
+	project.Services[newName] = service
+	delete(project.Services, oldName)
+	c.Projects[projectName] = project
+
+	return nil
+}

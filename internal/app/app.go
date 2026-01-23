@@ -51,7 +51,6 @@ func (a *App) Run() error {
 	a.program = tea.NewProgram(
 		a.model,
 		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
 	)
 
 	// Handle signals for graceful shutdown

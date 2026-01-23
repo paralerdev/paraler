@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-01-23
+
+### Added
+- **Copy mode** — press `y` to enter, select lines with `v`, copy with `y`/`Enter`
+- **Fullscreen logs** — press `f` to hide sidebar for easier mouse selection
+- **Status indicator in logs** — shows `[running]`/`[stopped]`/`[failed]` in log panel title
+- **System messages** — logs show `▶ Service started`, `■ Service stopped`, `✖ Service failed`
+- Move service between projects (`m` key)
+- Rename project (`Ctrl+R` key)
+
+### Changed
+- Health indicator only shows when health check is configured (no more `?`)
+- Focus returns to sidebar when exiting fullscreen mode
+
+### Fixed
+- Layout issues with ANSI escape codes from process output
+
 ## [0.1.0] - 2025-01-22
 
 ### Added
@@ -25,5 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Environment variables display
 - Port conflict detection
 
-[Unreleased]: https://github.com/paralerdev/paraler/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/paralerdev/paraler/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/paralerdev/paraler/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paralerdev/paraler/releases/tag/v0.1.0

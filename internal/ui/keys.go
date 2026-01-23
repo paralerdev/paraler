@@ -31,6 +31,12 @@ type KeyMap struct {
 	ExportLogs      key.Binding
 	ToggleSelect    key.Binding
 	ClearSelect     key.Binding
+	MoveService     key.Binding
+	Rename          key.Binding
+	CopyMode        key.Binding
+	CopyModeSelect  key.Binding
+	CopyModeCopy    key.Binding
+	Fullscreen      key.Binding
 }
 
 // DefaultKeyMap returns the default key bindings
@@ -129,8 +135,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("y", "confirm"),
 		),
 		ReloadConfig: key.NewBinding(
-			key.WithKeys("ctrl+r"),
-			key.WithHelp("ctrl+r", "reload config"),
+			key.WithKeys("R"),
+			key.WithHelp("R", "reload config"),
 		),
 		ExportLogs: key.NewBinding(
 			key.WithKeys("e"),
@@ -143,6 +149,30 @@ func DefaultKeyMap() KeyMap {
 		ClearSelect: key.NewBinding(
 			key.WithKeys("V"),
 			key.WithHelp("V", "clear selection"),
+		),
+		MoveService: key.NewBinding(
+			key.WithKeys("m"),
+			key.WithHelp("m", "move service"),
+		),
+		Rename: key.NewBinding(
+			key.WithKeys("ctrl+r"),
+			key.WithHelp("ctrl+r", "rename"),
+		),
+		CopyMode: key.NewBinding(
+			key.WithKeys("y"),
+			key.WithHelp("y", "copy mode"),
+		),
+		CopyModeSelect: key.NewBinding(
+			key.WithKeys("v"),
+			key.WithHelp("v", "select"),
+		),
+		CopyModeCopy: key.NewBinding(
+			key.WithKeys("y", "enter"),
+			key.WithHelp("y", "copy"),
+		),
+		Fullscreen: key.NewBinding(
+			key.WithKeys("f"),
+			key.WithHelp("f", "fullscreen"),
 		),
 	}
 }
@@ -159,6 +189,8 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Start, k.Stop, k.Restart},
 		{k.StartAll, k.StopAll},
 		{k.Filter, k.ClearLogs},
+		{k.DeleteService, k.DeleteProject},
+		{k.MoveService, k.Rename, k.ReloadConfig},
 		{k.Help, k.Quit},
 	}
 }

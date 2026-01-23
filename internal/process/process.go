@@ -155,6 +155,9 @@ func (p *Process) Start() error {
 	p.status = StatusRunning
 	p.mu.Unlock()
 
+	// Emit start message
+	p.emitSystemMessage("▶ Service started")
+
 	// Stream output in goroutines
 	go p.streamOutput(stdout, false)
 	go p.streamOutput(stderr, true)
@@ -235,23 +238,35 @@ func (p *Process) wait() {
 	err := cmd.Wait()
 
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.stoppedAt = time.Now()
 	p.exitErr = err
 
+	var newStatus Status
+	var exitCode int
+
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			p.exitCode = exitErr.ExitCode()
+			exitCode = exitErr.ExitCode()
 		}
 		if p.status != StatusStopping {
-			p.status = StatusFailed
+			newStatus = StatusFailed
 		} else {
-			p.status = StatusStopped
+			newStatus = StatusStopped
 		}
 	} else {
-		p.exitCode = 0
-		p.status = StatusStopped
+		exitCode = 0
+		newStatus = StatusStopped
+	}
+
+	p.exitCode = exitCode
+	p.status = newStatus
+	p.mu.Unlock()
+
+	// Emit stop message
+	if newStatus == StatusFailed {
+		p.emitSystemMessage(fmt.Sprintf("✖ Service failed (exit code: %d)", exitCode))
+	} else {
+		p.emitSystemMessage("■ Service stopped")
 	}
 }
 
@@ -282,6 +297,20 @@ func (p *Process) setStatus(s Status) {
 	p.mu.Lock()
 	p.status = s
 	p.mu.Unlock()
+}
+
+// emitSystemMessage sends a system message to the output channel
+func (p *Process) emitSystemMessage(msg string) {
+	select {
+	case p.outputCh <- OutputLine{
+		ServiceID: p.ID,
+		Line:      msg,
+		IsStderr:  false,
+		Timestamp: time.Now(),
+	}:
+	default:
+		// Drop if channel full
+	}
 }
 
 // IsRunning returns true if the process is currently running

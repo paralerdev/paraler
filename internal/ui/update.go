@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"os/exec"
 	"time"
 
 	"github.com/paralerdev/paraler/internal/log"
@@ -118,9 +119,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKeyMsg handles keyboard input
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	// If in copy mode, handle copy mode keys first
+	if m.logPanel.IsCopyMode() {
+		return m.handleCopyModeKeys(msg)
+	}
+
 	// If confirm modal is visible, handle its input
 	if m.showConfirm {
 		return m.handleConfirmKeys(msg)
+	}
+
+	// If move service modal is visible, handle its input
+	if m.showMoveService {
+		return m.handleMoveServiceKeys(msg)
+	}
+
+	// If rename modal is visible, handle its input
+	if m.showRename {
+		return m.handleRenameKeys(msg)
 	}
 
 	// If add project modal is visible, handle its input
@@ -170,6 +186,10 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 	case key.Matches(msg, m.keys.ExportLogs):
 		return m.exportLogs()
+
+	case key.Matches(msg, m.keys.Fullscreen):
+		m.toggleFullscreen()
+		return nil
 	}
 
 	// Panel-specific keys
@@ -218,6 +238,12 @@ func (m *Model) handleSidebarKeys(msg tea.KeyMsg) tea.Cmd {
 
 	case key.Matches(msg, m.keys.ClearSelect):
 		m.sidebar.ClearMultiSelect()
+
+	case key.Matches(msg, m.keys.MoveService):
+		m.ShowMoveService()
+
+	case key.Matches(msg, m.keys.Rename):
+		m.ShowRename()
 	}
 
 	return nil
@@ -259,9 +285,56 @@ func (m *Model) handleLogKeys(msg tea.KeyMsg) tea.Cmd {
 
 	case key.Matches(msg, m.keys.Restart):
 		return m.restartSelected()
+
+	case key.Matches(msg, m.keys.CopyMode):
+		m.logPanel.EnterCopyMode()
 	}
 
 	return nil
+}
+
+// handleCopyModeKeys handles keys when in copy mode
+func (m *Model) handleCopyModeKeys(msg tea.KeyMsg) tea.Cmd {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.logPanel.ExitCopyMode()
+
+	case key.Matches(msg, m.keys.Up):
+		m.logPanel.CopyModeCursorUp()
+
+	case key.Matches(msg, m.keys.Down):
+		m.logPanel.CopyModeCursorDown()
+
+	case key.Matches(msg, m.keys.CopyModeSelect):
+		m.logPanel.CopyModeToggleSelect()
+
+	case key.Matches(msg, m.keys.CopyModeCopy):
+		text := m.logPanel.CopyModeGetSelectedText()
+		if text != "" {
+			copyToClipboard(text)
+		}
+		m.logPanel.ExitCopyMode()
+	}
+
+	return nil
+}
+
+// copyToClipboard copies text to system clipboard using pbcopy (macOS)
+func copyToClipboard(text string) error {
+	cmd := exec.Command("pbcopy")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	stdin.Write([]byte(text))
+	stdin.Close()
+
+	return cmd.Wait()
 }
 
 // handleFilterInput handles input when filtering
@@ -443,9 +516,131 @@ type ServiceDeletedMsg struct {
 	Service string
 }
 
+// ServiceMovedMsg is sent when a service is moved
+type ServiceMovedMsg struct {
+	Service     string
+	FromProject string
+	ToProject   string
+}
+
+// ServiceMoveErrorMsg is sent when moving a service fails
+type ServiceMoveErrorMsg struct {
+	Error error
+}
+
 // ProjectDeletedMsg is sent when a project is deleted
 type ProjectDeletedMsg struct {
 	Name string
+}
+
+// handleMoveServiceKeys handles keys when move service modal is visible
+func (m *Model) handleMoveServiceKeys(msg tea.KeyMsg) tea.Cmd {
+	modal := m.moveServiceModal
+
+	switch {
+	case key.Matches(msg, m.keys.Up):
+		modal.MoveUp()
+
+	case key.Matches(msg, m.keys.Down):
+		modal.MoveDown()
+
+	case key.Matches(msg, m.keys.Enter):
+		// Execute the move
+		serviceName := modal.ServiceName()
+		fromProject := modal.FromProject()
+		toProject := modal.SelectedProject()
+
+		m.HideMoveService()
+
+		if toProject == "" {
+			return nil
+		}
+
+		return func() tea.Msg {
+			if err := m.MoveService(serviceName, fromProject, toProject); err != nil {
+				return ServiceMoveErrorMsg{Error: err}
+			}
+			return ServiceMovedMsg{
+				Service:     serviceName,
+				FromProject: fromProject,
+				ToProject:   toProject,
+			}
+		}
+
+	case key.Matches(msg, m.keys.Escape):
+		m.HideMoveService()
+	}
+
+	return nil
+}
+
+// handleRenameKeys handles keys when rename modal is visible
+func (m *Model) handleRenameKeys(msg tea.KeyMsg) tea.Cmd {
+	modal := m.renameModal
+
+	switch {
+	case key.Matches(msg, m.keys.Enter):
+		newName := modal.NewName()
+		if newName == "" {
+			modal.SetError("Name cannot be empty")
+			return nil
+		}
+
+		target := modal.Target()
+		projectName := modal.ProjectName()
+		serviceName := modal.ServiceName()
+
+		m.HideRename()
+
+		switch target {
+		case components.RenameProject:
+			return func() tea.Msg {
+				if err := m.RenameProject(projectName, newName); err != nil {
+					return RenameErrorMsg{Error: err}
+				}
+				return ProjectRenamedMsg{OldName: projectName, NewName: newName}
+			}
+		case components.RenameService:
+			return func() tea.Msg {
+				if err := m.RenameService(projectName, serviceName, newName); err != nil {
+					return RenameErrorMsg{Error: err}
+				}
+				return ServiceRenamedMsg{
+					Project: projectName,
+					OldName: serviceName,
+					NewName: newName,
+				}
+			}
+		}
+
+	case key.Matches(msg, m.keys.Escape):
+		m.HideRename()
+		return nil
+	}
+
+	// Pass to text input
+	input := modal.Input()
+	newInput, cmd := input.Update(msg)
+	*input = newInput
+	return cmd
+}
+
+// ProjectRenamedMsg is sent when a project is renamed
+type ProjectRenamedMsg struct {
+	OldName string
+	NewName string
+}
+
+// ServiceRenamedMsg is sent when a service is renamed
+type ServiceRenamedMsg struct {
+	Project string
+	OldName string
+	NewName string
+}
+
+// RenameErrorMsg is sent when renaming fails
+type RenameErrorMsg struct {
+	Error error
 }
 
 // reloadConfig reloads the config file

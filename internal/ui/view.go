@@ -12,12 +12,20 @@ func (m *Model) View() string {
 		return "Loading..."
 	}
 
-	// Main content area
-	sidebar := m.sidebar.View(m.manager, m.logBuffer)
-	logs := m.logPanel.View(m.logBuffer)
+	// Update log panel with current service status
+	m.updateLogPanelStatus()
 
-	// Join sidebar and logs horizontally
-	mainArea := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, logs)
+	// Main content area
+	var mainArea string
+	if m.fullscreen {
+		// Fullscreen mode: only logs
+		mainArea = m.logPanel.View(m.logBuffer)
+	} else {
+		// Normal mode: sidebar + logs
+		sidebar := m.sidebar.View(m.manager, m.logBuffer)
+		logs := m.logPanel.View(m.logBuffer)
+		mainArea = lipgloss.JoinHorizontal(lipgloss.Top, sidebar, logs)
+	}
 
 	// Status bar
 	var statusBar string
@@ -36,6 +44,14 @@ func (m *Model) View() string {
 	// Overlay modals if visible
 	if m.showConfirm {
 		return m.overlayConfirmModal(b.String())
+	}
+
+	if m.showMoveService {
+		return m.overlayMoveServiceModal(b.String())
+	}
+
+	if m.showRename {
+		return m.overlayRenameModal(b.String())
 	}
 
 	if m.showAddProject {
@@ -79,4 +95,28 @@ func (m *Model) overlayConfirmModal(background string) string {
 		Align(lipgloss.Center, lipgloss.Center)
 
 	return modalStyle.Render(m.confirmModal.View())
+}
+
+// overlayMoveServiceModal overlays the move service modal
+func (m *Model) overlayMoveServiceModal(background string) string {
+	m.moveServiceModal.SetSize(m.width / 2)
+
+	modalStyle := lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	return modalStyle.Render(m.moveServiceModal.View())
+}
+
+// overlayRenameModal overlays the rename modal
+func (m *Model) overlayRenameModal(background string) string {
+	m.renameModal.SetSize(m.width / 2)
+
+	modalStyle := lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	return modalStyle.Render(m.renameModal.View())
 }

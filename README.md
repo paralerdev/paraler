@@ -65,7 +65,8 @@ projects:
 ## Features
 
 - **Start/stop/restart** — single keypress, or all at once
-- **Logs** — stdout/stderr from every service, with filtering
+- **Logs** — stdout/stderr with filtering, fullscreen mode, and copy mode
+- **Status indicators** — see running/stopped/failed state at a glance
 - **Health checks** — HTTP endpoints and port monitoring
 - **Auto-restart** — crashed service comes back automatically
 - **Auto-discovery** — detects NestJS, React, Vue, Go, and more
@@ -78,9 +79,21 @@ projects:
 Navigation  ↑/k up │ ↓/j down │ Tab switch panel
 Services    s start │ x stop │ r restart
 Bulk        S start all │ X stop all │ v select
-Logs        / filter │ c clear │ e export
+Logs        / filter │ c clear │ e export │ f fullscreen │ y copy mode
 Other       a add project │ ? help │ q quit
 ```
+
+### Copy Mode
+
+Press `y` when focused on logs to enter copy mode:
+- `↑/↓` — move cursor
+- `v` — start selection
+- `y` or `Enter` — copy to clipboard
+- `Esc` — exit
+
+### Fullscreen
+
+Press `f` to toggle fullscreen logs — hides sidebar for easier text selection with mouse.
 
 ## Config Options
 

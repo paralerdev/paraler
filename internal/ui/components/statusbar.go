@@ -88,8 +88,7 @@ func (s *StatusBar) renderStatus(manager *process.Manager) string {
 		s.keyHint("s", "start"),
 		s.keyHint("x", "stop"),
 		s.keyHint("r", "restart"),
-		s.keyHint("a", "add"),
-		s.keyHint("d", "del"),
+		s.keyHint("f", "fullscreen"),
 		s.keyHint("?", "help"),
 		s.keyHint("q", "quit"),
 	}
@@ -120,7 +119,7 @@ func (s *StatusBar) renderHelp() string {
 		{"Navigation", "↑/k up", "↓/j down", "Tab switch panel", "pgup/pgdn scroll"},
 		{"Services", "s start", "x stop", "r restart"},
 		{"Bulk", "S start all", "X stop all"},
-		{"Logs", "/ filter", "c clear", "g top", "G bottom"},
+		{"Logs", "/ filter", "c clear", "g top", "G bottom", "y copy mode", "f fullscreen"},
 		{"Projects", "a add", "d delete service", "D delete project"},
 		{"Other", "? help", "q quit"},
 	}

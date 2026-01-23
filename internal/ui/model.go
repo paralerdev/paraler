@@ -35,20 +35,25 @@ type Model struct {
 	logBuffer *log.Buffer
 
 	// UI components
-	sidebar         *components.Sidebar
-	logPanel        *components.LogPanel
-	statusBar       *components.StatusBar
-	addProjectModal *components.AddProjectModal
-	confirmModal    *components.ConfirmModal
+	sidebar          *components.Sidebar
+	logPanel         *components.LogPanel
+	statusBar        *components.StatusBar
+	addProjectModal  *components.AddProjectModal
+	confirmModal     *components.ConfirmModal
+	moveServiceModal *components.MoveServiceModal
+	renameModal      *components.RenameModal
 
 	// UI state
-	focus           Focus
-	showHelp        bool
-	showAddProject  bool
-	showConfirm     bool
-	width           int
-	height          int
-	ready           bool
+	focus            Focus
+	showHelp         bool
+	showAddProject   bool
+	showConfirm      bool
+	showMoveService  bool
+	showRename       bool
+	fullscreen       bool
+	width            int
+	height           int
+	ready            bool
 
 	// Key bindings
 	keys KeyMap
@@ -59,17 +64,19 @@ func NewModel(cfg *config.Config, configPath string) *Model {
 	manager := process.NewManager(cfg)
 
 	m := &Model{
-		config:          cfg,
-		configPath:      configPath,
-		manager:         manager,
-		logBuffer:       log.NewBuffer(1000),
-		sidebar:         components.NewSidebar(cfg),
-		logPanel:        components.NewLogPanel(),
-		statusBar:       components.NewStatusBar(),
-		addProjectModal: components.NewAddProjectModal(),
-		confirmModal:    components.NewConfirmModal(),
-		focus:           FocusSidebar,
-		keys:            DefaultKeyMap(),
+		config:           cfg,
+		configPath:       configPath,
+		manager:          manager,
+		logBuffer:        log.NewBuffer(1000),
+		sidebar:          components.NewSidebar(cfg),
+		logPanel:         components.NewLogPanel(),
+		statusBar:        components.NewStatusBar(),
+		addProjectModal:  components.NewAddProjectModal(),
+		confirmModal:     components.NewConfirmModal(),
+		moveServiceModal: components.NewMoveServiceModal(),
+		renameModal:      components.NewRenameModal(),
+		focus:            FocusSidebar,
+		keys:             DefaultKeyMap(),
 	}
 
 	// Select first service if available
@@ -217,6 +224,130 @@ func (m *Model) DeleteProject(projectName string) error {
 	return nil
 }
 
+// ShowMoveService shows the move service modal
+func (m *Model) ShowMoveService() {
+	selected := m.sidebar.Selected()
+	if selected.Service == "" {
+		return
+	}
+
+	// Get all project names
+	projectNames := m.config.ProjectNames()
+	if len(projectNames) < 2 {
+		// Need at least 2 projects to move
+		return
+	}
+
+	m.moveServiceModal.Show(selected.Service, selected.Project, projectNames)
+	m.moveServiceModal.SetSize(m.width / 2)
+	m.showMoveService = true
+}
+
+// HideMoveService hides the move service modal
+func (m *Model) HideMoveService() {
+	m.moveServiceModal.Hide()
+	m.showMoveService = false
+}
+
+// MoveServiceModal returns the move service modal
+func (m *Model) MoveServiceModal() *components.MoveServiceModal {
+	return m.moveServiceModal
+}
+
+// IsMoveServiceVisible returns true if move service modal is visible
+func (m *Model) IsMoveServiceVisible() bool {
+	return m.showMoveService
+}
+
+// MoveService moves a service to another project
+func (m *Model) MoveService(serviceName, fromProject, toProject string) error {
+	// Stop the service if running
+	id := config.ServiceID{Project: fromProject, Service: serviceName}
+	m.manager.Stop(id)
+
+	// Move in config
+	if err := m.config.MoveService(serviceName, fromProject, toProject); err != nil {
+		return err
+	}
+
+	// Save config
+	if err := m.config.Save(m.configPath); err != nil {
+		return err
+	}
+
+	// Reload UI
+	m.ReloadConfig()
+	return nil
+}
+
+// ShowRename shows the rename modal for the project of the selected service
+func (m *Model) ShowRename() {
+	selected := m.sidebar.Selected()
+	if selected.Project == "" {
+		return
+	}
+	m.renameModal.ShowRenameProject(selected.Project)
+	m.renameModal.SetSize(m.width / 2)
+	m.showRename = true
+}
+
+// HideRename hides the rename modal
+func (m *Model) HideRename() {
+	m.renameModal.Hide()
+	m.showRename = false
+}
+
+// RenameModal returns the rename modal
+func (m *Model) RenameModal() *components.RenameModal {
+	return m.renameModal
+}
+
+// IsRenameVisible returns true if rename modal is visible
+func (m *Model) IsRenameVisible() bool {
+	return m.showRename
+}
+
+// RenameProject renames a project
+func (m *Model) RenameProject(oldName, newName string) error {
+	// Stop all services in the project
+	m.manager.StopProject(oldName)
+
+	// Rename in config
+	if err := m.config.RenameProject(oldName, newName); err != nil {
+		return err
+	}
+
+	// Save config
+	if err := m.config.Save(m.configPath); err != nil {
+		return err
+	}
+
+	// Reload UI
+	m.ReloadConfig()
+	return nil
+}
+
+// RenameService renames a service
+func (m *Model) RenameService(projectName, oldName, newName string) error {
+	// Stop the service if running
+	id := config.ServiceID{Project: projectName, Service: oldName}
+	m.manager.Stop(id)
+
+	// Rename in config
+	if err := m.config.RenameService(projectName, oldName, newName); err != nil {
+		return err
+	}
+
+	// Save config
+	if err := m.config.Save(m.configPath); err != nil {
+		return err
+	}
+
+	// Reload UI
+	m.ReloadConfig()
+	return nil
+}
+
 // Init initializes the model
 func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
@@ -247,6 +378,22 @@ func (m *Model) updateLogPanelService() {
 	m.logPanel.SetServiceConfig(nil)
 }
 
+// updateLogPanelStatus updates the log panel with current service status
+func (m *Model) updateLogPanelStatus() {
+	selected := m.sidebar.Selected()
+	if selected.Service == "" {
+		m.logPanel.SetStatus(process.StatusStopped)
+		return
+	}
+
+	proc := m.manager.Get(selected)
+	if proc != nil {
+		m.logPanel.SetStatus(proc.Status())
+	} else {
+		m.logPanel.SetStatus(process.StatusStopped)
+	}
+}
+
 // setFocus sets the focus to a specific panel
 func (m *Model) setFocus(focus Focus) {
 	m.focus = focus
@@ -256,11 +403,33 @@ func (m *Model) setFocus(focus Focus) {
 
 // toggleFocus switches focus between panels
 func (m *Model) toggleFocus() {
+	if m.fullscreen {
+		// In fullscreen, always focus on logs
+		return
+	}
 	if m.focus == FocusSidebar {
 		m.setFocus(FocusLogs)
 	} else {
 		m.setFocus(FocusSidebar)
 	}
+}
+
+// toggleFullscreen toggles fullscreen mode for logs
+func (m *Model) toggleFullscreen() {
+	m.fullscreen = !m.fullscreen
+	if m.fullscreen {
+		// In fullscreen, always focus on logs
+		m.setFocus(FocusLogs)
+	} else {
+		// Exit fullscreen, return focus to sidebar
+		m.setFocus(FocusSidebar)
+	}
+	m.calculateLayout()
+}
+
+// IsFullscreen returns true if in fullscreen mode
+func (m *Model) IsFullscreen() bool {
+	return m.fullscreen
 }
 
 // startSelected starts the selected service(s)
@@ -361,18 +530,6 @@ func (m *Model) clearLogs() {
 
 // calculateLayout calculates panel sizes based on terminal dimensions
 func (m *Model) calculateLayout() {
-	// Sidebar takes ~25% width, min 20, max 40
-	sidebarWidth := m.width / 4
-	if sidebarWidth < 20 {
-		sidebarWidth = 20
-	}
-	if sidebarWidth > 40 {
-		sidebarWidth = 40
-	}
-
-	// Log panel takes remaining width
-	logWidth := m.width - sidebarWidth - 1
-
 	// Status bar height
 	statusHeight := 1
 	if m.showHelp {
@@ -382,8 +539,27 @@ func (m *Model) calculateLayout() {
 	// Panel heights (subtract status bar)
 	panelHeight := m.height - statusHeight - 1
 
-	m.sidebar.SetSize(sidebarWidth, panelHeight)
-	m.logPanel.SetSize(logWidth, panelHeight)
+	if m.fullscreen {
+		// Fullscreen mode: logs take full width
+		m.logPanel.SetSize(m.width, panelHeight)
+	} else {
+		// Normal mode: sidebar + logs
+		// Sidebar takes ~25% width, min 20, max 40
+		sidebarWidth := m.width / 4
+		if sidebarWidth < 20 {
+			sidebarWidth = 20
+		}
+		if sidebarWidth > 40 {
+			sidebarWidth = 40
+		}
+
+		// Log panel takes remaining width
+		logWidth := m.width - sidebarWidth - 1
+
+		m.sidebar.SetSize(sidebarWidth, panelHeight)
+		m.logPanel.SetSize(logWidth, panelHeight)
+	}
+
 	m.statusBar.SetWidth(m.width)
 }
 
