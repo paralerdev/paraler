@@ -42,6 +42,10 @@ func (m *Model) View() string {
 	b.WriteString(statusBar)
 
 	// Overlay modals if visible
+	if m.showPortConflict {
+		return m.overlayPortConflictModal(b.String())
+	}
+
 	if m.showConfirm {
 		return m.overlayConfirmModal(b.String())
 	}
@@ -119,4 +123,16 @@ func (m *Model) overlayRenameModal(background string) string {
 		Align(lipgloss.Center, lipgloss.Center)
 
 	return modalStyle.Render(m.renameModal.View())
+}
+
+// overlayPortConflictModal overlays the port conflict modal
+func (m *Model) overlayPortConflictModal(background string) string {
+	m.portConflictModal.SetSize(m.width / 2)
+
+	modalStyle := lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	return modalStyle.Render(m.portConflictModal.View())
 }

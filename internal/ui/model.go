@@ -35,22 +35,24 @@ type Model struct {
 	logBuffer *log.Buffer
 
 	// UI components
-	sidebar          *components.Sidebar
-	logPanel         *components.LogPanel
-	statusBar        *components.StatusBar
-	addProjectModal  *components.AddProjectModal
-	confirmModal     *components.ConfirmModal
-	moveServiceModal *components.MoveServiceModal
-	renameModal      *components.RenameModal
+	sidebar            *components.Sidebar
+	logPanel           *components.LogPanel
+	statusBar          *components.StatusBar
+	addProjectModal    *components.AddProjectModal
+	confirmModal       *components.ConfirmModal
+	moveServiceModal   *components.MoveServiceModal
+	renameModal        *components.RenameModal
+	portConflictModal  *components.PortConflictModal
 
 	// UI state
-	focus            Focus
-	showHelp         bool
-	showAddProject   bool
-	showConfirm      bool
-	showMoveService  bool
-	showRename       bool
-	fullscreen       bool
+	focus             Focus
+	showHelp          bool
+	showAddProject    bool
+	showConfirm       bool
+	showMoveService   bool
+	showRename        bool
+	showPortConflict  bool
+	fullscreen        bool
 	width            int
 	height           int
 	ready            bool
@@ -64,19 +66,20 @@ func NewModel(cfg *config.Config, configPath string) *Model {
 	manager := process.NewManager(cfg)
 
 	m := &Model{
-		config:           cfg,
-		configPath:       configPath,
-		manager:          manager,
-		logBuffer:        log.NewBuffer(1000),
-		sidebar:          components.NewSidebar(cfg),
-		logPanel:         components.NewLogPanel(),
-		statusBar:        components.NewStatusBar(),
-		addProjectModal:  components.NewAddProjectModal(),
-		confirmModal:     components.NewConfirmModal(),
-		moveServiceModal: components.NewMoveServiceModal(),
-		renameModal:      components.NewRenameModal(),
-		focus:            FocusSidebar,
-		keys:             DefaultKeyMap(),
+		config:            cfg,
+		configPath:        configPath,
+		manager:           manager,
+		logBuffer:         log.NewBuffer(1000),
+		sidebar:           components.NewSidebar(cfg),
+		logPanel:          components.NewLogPanel(),
+		statusBar:         components.NewStatusBar(),
+		addProjectModal:   components.NewAddProjectModal(),
+		confirmModal:      components.NewConfirmModal(),
+		moveServiceModal:  components.NewMoveServiceModal(),
+		renameModal:       components.NewRenameModal(),
+		portConflictModal: components.NewPortConflictModal(),
+		focus:             FocusSidebar,
+		keys:              DefaultKeyMap(),
 	}
 
 	// Select first service if available
@@ -348,6 +351,29 @@ func (m *Model) RenameService(projectName, oldName, newName string) error {
 	return nil
 }
 
+// ShowPortConflict shows the port conflict modal
+func (m *Model) ShowPortConflict(serviceID config.ServiceID, conflict *process.PortConflictInfo) {
+	m.portConflictModal.Show(serviceID, conflict)
+	m.portConflictModal.SetSize(m.width / 2)
+	m.showPortConflict = true
+}
+
+// HidePortConflict hides the port conflict modal
+func (m *Model) HidePortConflict() {
+	m.portConflictModal.Hide()
+	m.showPortConflict = false
+}
+
+// PortConflictModal returns the port conflict modal
+func (m *Model) PortConflictModal() *components.PortConflictModal {
+	return m.portConflictModal
+}
+
+// IsPortConflictVisible returns true if port conflict modal is visible
+func (m *Model) IsPortConflictVisible() bool {
+	return m.showPortConflict
+}
+
 // Init initializes the model
 func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
@@ -451,6 +477,14 @@ func (m *Model) startSelected() tea.Cmd {
 	if selected.Service == "" {
 		return nil
 	}
+
+	// Check for port conflicts before starting
+	conflict := m.manager.CheckPortAvailability(selected)
+	if conflict != nil {
+		m.ShowPortConflict(selected, conflict)
+		return nil
+	}
+
 	return func() tea.Msg {
 		m.logBuffer.Clear(selected) // Clear old logs/errors
 		m.manager.Start(selected)

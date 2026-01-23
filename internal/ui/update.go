@@ -124,6 +124,11 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return m.handleCopyModeKeys(msg)
 	}
 
+	// If port conflict modal is visible, handle its input
+	if m.showPortConflict {
+		return m.handlePortConflictKeys(msg)
+	}
+
 	// If confirm modal is visible, handle its input
 	if m.showConfirm {
 		return m.handleConfirmKeys(msg)
@@ -473,6 +478,47 @@ func (m *Model) confirmAddProject() tea.Cmd {
 
 		return ProjectAddedMsg{Name: detected.Name}
 	}
+}
+
+// handlePortConflictKeys handles keys when port conflict modal is visible
+func (m *Model) handlePortConflictKeys(msg tea.KeyMsg) tea.Cmd {
+	switch {
+	case msg.String() == "k":
+		// Kill the process and start the service
+		modal := m.portConflictModal
+		conflict := modal.Conflict()
+		serviceID := modal.ServiceID()
+
+		m.HidePortConflict()
+
+		if conflict == nil {
+			return nil
+		}
+
+		return func() tea.Msg {
+			// Kill the process using the port
+			if conflict.IsParalerService {
+				// Stop the paraler service
+				m.manager.Stop(conflict.ParalerServiceID)
+				time.Sleep(100 * time.Millisecond)
+			} else {
+				// Kill external process
+				if err := m.manager.KillPortProcess(conflict.Port); err != nil {
+					// Log error but try to start anyway
+				}
+			}
+
+			// Start our service
+			m.logBuffer.Clear(serviceID)
+			m.manager.Start(serviceID)
+			return ProcessStatusChangedMsg{}
+		}
+
+	case key.Matches(msg, m.keys.Escape):
+		m.HidePortConflict()
+	}
+
+	return nil
 }
 
 // handleConfirmKeys handles keys when confirm modal is visible

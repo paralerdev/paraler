@@ -450,3 +450,52 @@ func (m *Manager) GetRunningPorts() map[int]config.ServiceID {
 	}
 	return ports
 }
+
+// PortConflictInfo contains information about a port conflict
+type PortConflictInfo struct {
+	Port            int
+	IsParalerService bool              // True if port is used by another paraler service
+	ParalerServiceID config.ServiceID  // The paraler service using the port
+	ExternalPID     int               // PID of external process
+	ExternalProcess string            // Name of external process
+	ExternalCommand string            // Command line of external process
+}
+
+// CheckPortAvailability checks if a service's port is available before starting
+// Returns nil if port is available, or PortConflictInfo if there's a conflict
+func (m *Manager) CheckPortAvailability(id config.ServiceID) *PortConflictInfo {
+	proc := m.Get(id)
+	if proc == nil || proc.Config.Port == 0 {
+		return nil // No port configured, no conflict possible
+	}
+
+	port := proc.Config.Port
+
+	// First check if another paraler service is using this port
+	if hasConflict, conflictID := m.CheckPortConflict(id); hasConflict {
+		return &PortConflictInfo{
+			Port:             port,
+			IsParalerService: true,
+			ParalerServiceID: conflictID,
+		}
+	}
+
+	// Check if an external process is using the port
+	status := GetPortStatus(port)
+	if status.InUse {
+		return &PortConflictInfo{
+			Port:            port,
+			IsParalerService: false,
+			ExternalPID:     status.PID,
+			ExternalProcess: status.Process,
+			ExternalCommand: status.Command,
+		}
+	}
+
+	return nil // Port is available
+}
+
+// KillPortProcess kills the process using a specific port
+func (m *Manager) KillPortProcess(port int) error {
+	return KillProcessOnPort(port)
+}
