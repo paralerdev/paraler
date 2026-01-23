@@ -2,6 +2,9 @@ package ui
 
 import (
 	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/paralerdev/paraler/internal/log"
@@ -99,6 +102,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Timestamp: msg.Line.Timestamp,
 		}
 		m.logBuffer.Add(entry)
+
+		// Check for EADDRINUSE error (port already in use)
+		if port := parsePortFromEADDRINUSE(msg.Line.Line); port > 0 {
+			// Only show if this is the currently selected service
+			if msg.Line.ServiceID == m.sidebar.Selected() && !m.showPortConflict {
+				conflict := m.manager.CheckPortAvailability(msg.Line.ServiceID)
+				if conflict == nil {
+					// Port wasn't in config, create conflict info from detected port
+					status := process.GetPortStatus(port)
+					conflict = &process.PortConflictInfo{
+						Port:            port,
+						IsParalerService: false,
+						ExternalPID:     status.PID,
+						ExternalProcess: status.Process,
+						ExternalCommand: status.Command,
+					}
+				}
+				m.ShowPortConflict(msg.Line.ServiceID, conflict)
+			}
+		}
 
 		// Continue listening
 		cmds = append(cmds, m.listenForOutput())
@@ -708,4 +731,42 @@ func (m *Model) exportLogs() tea.Cmd {
 		}
 		return LogsExportedMsg{Path: path}
 	}
+}
+
+// parsePortFromEADDRINUSE extracts port number from EADDRINUSE error messages
+// Supports various formats:
+// - "EADDRINUSE: address already in use :::3021"
+// - "port: 3021"
+// - "listen EADDRINUSE: address already in use 0.0.0.0:3000"
+func parsePortFromEADDRINUSE(line string) int {
+	// Must contain EADDRINUSE
+	if !strings.Contains(line, "EADDRINUSE") && !strings.Contains(line, "address already in use") {
+		return 0
+	}
+
+	// Try to find "port: NNNN" pattern (Node.js error format)
+	portPattern := regexp.MustCompile(`port:\s*(\d+)`)
+	if matches := portPattern.FindStringSubmatch(line); len(matches) > 1 {
+		if port, err := strconv.Atoi(matches[1]); err == nil {
+			return port
+		}
+	}
+
+	// Try to find :::PORT or :PORT pattern
+	addrPattern := regexp.MustCompile(`:::?(\d+)`)
+	if matches := addrPattern.FindStringSubmatch(line); len(matches) > 1 {
+		if port, err := strconv.Atoi(matches[1]); err == nil {
+			return port
+		}
+	}
+
+	// Try to find IP:PORT pattern (0.0.0.0:3000, 127.0.0.1:8080)
+	ipPortPattern := regexp.MustCompile(`\d+\.\d+\.\d+\.\d+:(\d+)`)
+	if matches := ipPortPattern.FindStringSubmatch(line); len(matches) > 1 {
+		if port, err := strconv.Atoi(matches[1]); err == nil {
+			return port
+		}
+	}
+
+	return 0
 }
