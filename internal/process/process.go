@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -120,6 +121,13 @@ func (p *Process) Start() error {
 	p.cancel = cancel
 	p.mu.Unlock()
 
+	// Check if working directory exists
+	if _, err := os.Stat(p.Cwd); os.IsNotExist(err) {
+		p.setStatus(StatusFailed)
+		p.emitSystemMessage(fmt.Sprintf("✖ Directory not found: %s", p.Cwd))
+		return fmt.Errorf("working directory does not exist: %s", p.Cwd)
+	}
+
 	// Create command with shell
 	cmd := exec.CommandContext(ctx, "sh", "-c", p.Config.Cmd)
 	cmd.Dir = p.Cwd
@@ -134,18 +142,23 @@ func (p *Process) Start() error {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		p.setStatus(StatusFailed)
+		p.emitSystemMessage(fmt.Sprintf("✖ Failed to start: %v", err))
 		return fmt.Errorf("failed to get stdout pipe: %w", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		p.setStatus(StatusFailed)
+		p.emitSystemMessage(fmt.Sprintf("✖ Failed to start: %v", err))
 		return fmt.Errorf("failed to get stderr pipe: %w", err)
 	}
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
 		p.setStatus(StatusFailed)
+		p.emitSystemMessage(fmt.Sprintf("✖ Failed to start: %v", err))
+		p.emitSystemMessage(fmt.Sprintf("  Command: %s", p.Config.Cmd))
+		p.emitSystemMessage(fmt.Sprintf("  Directory: %s", p.Cwd))
 		return fmt.Errorf("failed to start process: %w", err)
 	}
 
@@ -265,6 +278,8 @@ func (p *Process) wait() {
 	// Emit stop message
 	if newStatus == StatusFailed {
 		p.emitSystemMessage(fmt.Sprintf("✖ Service failed (exit code: %d)", exitCode))
+		p.emitSystemMessage(fmt.Sprintf("  Command: %s", p.Config.Cmd))
+		p.emitSystemMessage(fmt.Sprintf("  Directory: %s", p.Cwd))
 	} else {
 		p.emitSystemMessage("■ Service stopped")
 	}

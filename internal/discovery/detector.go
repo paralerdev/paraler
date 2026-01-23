@@ -147,6 +147,20 @@ func (d *Detector) Detect(projectPath string) (*DetectedProject, error) {
 		}
 	}
 
+	// If no services found, scan all first-level subdirectories
+	// This handles custom-named projects like myproject-api, myproject-web
+	if len(project.Services) == 0 {
+		if entries, err := os.ReadDir(absPath); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+					subPath := filepath.Join(absPath, entry.Name())
+					services := d.scanDirectory(subPath, entry.Name())
+					project.Services = append(project.Services, services...)
+				}
+			}
+		}
+	}
+
 	// Deduplicate services
 	project.Services = d.deduplicateServices(project.Services)
 
