@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Port conflict detection** — warns when port is already in use before starting service
+- **EADDRINUSE auto-detection** — parses port errors from logs and shows conflict modal
 - Shows process info (PID, name, command) using the port
 - Option to kill blocking process and start service (`k` key)
 - Detailed error messages when service fails to start (shows command and directory)
